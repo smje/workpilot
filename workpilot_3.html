@@ -659,7 +659,7 @@ $('#m-run').addEventListener('click',async()=>{
   const out=await runSteps(c,['녹취록 분석','안건·결정사항 추출','액션아이템 정리','회의록 포맷팅'],async(i,o)=>{
     if(S.mode==='demo'){await sleep(600); if(i===3)o.r=MOCK.meetingResult; return;}
     if(i===3){
-      const sys='너는 회의록 작성 비서다. 반드시 JSON으로만 답하라: {summary, agenda[], decisions[], actions:[{task,owner,due}]}';
+      const sys='너는 회의록 작성 비서다. 모든 항목을 격식 있는 개조식 문어체로 간결하게 작성하라(예: "~함", "~하기로 함", "~필요", "~예정"). 구어체·존댓말·군더더기는 쓰지 마라. 반드시 JSON으로만 답하라: {summary, agenda[], decisions[], actions:[{task,owner,due}]}';
       const txt=await callLLM(sys,'다음 회의 녹취록을 회의록으로 정리해줘:\n\n'+transcript);
       o.r=JSON.parse(txt.replace(/```json|```/g,'').trim());
     }else await sleep(300);
