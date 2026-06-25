@@ -255,6 +255,11 @@
           <h3>🚨 긴급 키워드 <span style="font-weight:400;color:var(--faint);font-size:12px">(변수)</span></h3>
           <div class="tag-input" id="t-keywords-box"><input type="text" id="t-keywords-input" placeholder="키워드 입력 후 Enter" /></div>
         </div>
+        <div class="card" style="margin-top:16px">
+          <h3>📲 카카오톡 알림 발신자 <span style="font-weight:400;color:var(--faint);font-size:12px">(변수)</span></h3>
+          <div class="tag-input" id="t-watch-box"><input type="text" id="t-watch-input" placeholder="이메일 입력 후 Enter" /></div>
+          <div class="hint">이 발신자의 메일이 오면 카카오톡으로 즉시 알림을 보냅니다.</div>
+        </div>
         <div style="margin-top:16px">
           <button class="btn primary" id="t-run">✦ 지금 실행</button>
         </div>
@@ -329,8 +334,9 @@ const S = {
   llm: { provider:'anthropic', key:'' },
   gemini: { key:'' },
   meetingAttendees: [],
-  importantSenders: ['noreply@github.com','notifications@vercel.com'],
-  urgentKeywords: ['로그인','sign-in','승인','계약','마감','긴급'],
+  importantSenders: ['teamlead@company.com','purchase@daehan.co.kr','security@company.com'],
+  urgentKeywords: ['긴급','계약','회의','마감','승인','검토'],
+  watchedSenders: ['teamlead@company.com'],
 };
 
 // ── 자격증명을 localStorage에 저장 (직접 호스팅하는 단독 앱이라 안전) ──
@@ -399,6 +405,7 @@ function setupTags(boxSel,inputSel,arr,render){
 setupTags('#m-attendees-box','#m-attendees-input',S.meetingAttendees);
 setupTags('#t-senders-box','#t-senders-input',S.importantSenders);
 setupTags('#t-keywords-box','#t-keywords-input',S.urgentKeywords);
+setupTags('#t-watch-box','#t-watch-input',S.watchedSenders);
 
 /* ---------- progress UI ---------- */
 async function runSteps(container,labels,worker){
@@ -512,23 +519,18 @@ const MOCK = {
   calEvents:[
     '월 10:00 3분기 마케팅 킥오프','월 15:00 디자인팀 싱크','화 11:00 신규 채용 면접',
     '수 14:00 ROAS 리뷰','목 10:30 대행사 미팅','금 16:00 주간 회고'],
-  // ── 실제 받은편지함 스냅샷 (2026-06-25, 안 읽은 메일 25건 중 대표 15건을 AI가 분류) ──
+  // ── 큐레이션 예시 받은편지함 (포트폴리오 시연용 · 다양한 발신자 10건) ──
   mails:[
-    {from:'GitHub <noreply@github.com>',subj:'[GitHub] Sign-in from an unrecognized location',snip:'Your GitHub account was successfully signed in to but we did not recognize the location...',cat:'work',important:true,reply:false},
-    {from:'Vercel <notifications@vercel.com>',subj:'New sign-in detected on your Vercel account',snip:'Your Vercel account was recently signed-in from a new location: Geoje-si, Gyeongsangnam-do...',cat:'work',important:true,reply:false},
-    {from:'Google <no-reply@accounts.google.com>',subj:'새로운 계정 로그인 알림',snip:'내 Google 계정에 새로 로그인했습니다. 본인이 아니라면 안내에 따라 계정을 보호하세요...',cat:'personal',important:true,reply:false},
-    {from:'GitHub <noreply@github.com>',subj:'A third-party OAuth application (Upstash) was authorized',snip:'A third-party OAuth application with read:user and user:email scopes was authorized...',cat:'work',important:true,reply:false},
-    {from:'제약기술재단 <edu@kpti.or.kr>',subj:'2026년 하반기 GMP 교육과정 및 자격시험·VOD 안내',snip:'제약·바이오 산업 종사자 실무역량 강화를 위한 정기세미나 및 자격시험 일정 안내...',cat:'work',important:false,reply:true},
-    {from:'Anthropic <invoice+statements@anthropic.com>',subj:'Your receipt from Anthropic, PBC #2890-9359-1378',snip:'Receipt for your recent payment...',cat:'personal',important:false,reply:false},
-    {from:'Anthropic <noreply@anthropic.com>',subj:'Thanks for starting your Pro subscription, Mj',snip:'Your payment method has been charged. The next charge will be on Jun 24, 2027...',cat:'personal',important:false,reply:false},
-    {from:'KG이니시스 <noreply@inicis.com>',subj:'[결제내역 안내] (주)에스씨케이컴퍼니 6,700원',snip:'성민제 고객님이 KG이니시스 결제시스템을 통해 결제하신 내역입니다. 결제금액 6,700원...',cat:'personal',important:false,reply:false},
-    {from:'Upstash <noreply@upstash.com>',subj:'Welcome to Upstash',snip:'Check out our blog posts and documents to dive right into serverless use cases...',cat:'work',important:false,reply:false},
-    {from:'Google Cloud <cloud-noreply@google.com>',subj:'Google Cloud 시작하기',snip:'빠르게 시작하고 Google Cloud에서 제공되는 기능을 살펴보세요...',cat:'work',important:false,reply:false},
-    {from:'오픈서베이 <marketing@opensurvey.co.kr>',subj:'데이터스페이스 AI로 리서치를 더 빠르게',snip:'설문 설계부터 응답 수집까지 하루면 충분합니다...',cat:'spam',important:false,reply:false},
-    {from:'잇다 <newsletter@itdaa.net>',subj:'잇다 뉴스 📊 / SK하이닉스, AI 인재는 이런 사람',snip:'1. 경제 뉴스 2. 채용 뉴스 3. 온라인 클래스 4. 채용 정보...',cat:'spam',important:false,reply:false},
-    {from:'빌딩포인트코리아 <info@buildingpoint.co.kr>',subj:'스케치업 프로 제품 한정 15% 할인 혜택!',snip:'스케치업 기초부터 탄탄하게 배우기 — 한정 프로모션...',cat:'spam',important:false,reply:false},
-    {from:'Claude <hello@anthropic.com>',subj:'Your first "aha moment" with Claude',snip:'The moment happens faster when you give Claude context. Here is how...',cat:'spam',important:false,reply:false},
-    {from:'Link <no-reply@link.com>',subj:'New device login to your Link account',snip:'We noticed a login to your Link account from a new device...',cat:'personal',important:false,reply:false},
+    {from:'김성호 팀장 <teamlead@company.com>',subj:'[회의] 3분기 OKR 점검 — 목요일 14시',snip:'이번 분기 목표 점검 회의를 목요일 오후 2시에 진행합니다. 각자 KPI 진행률 정리해 오세요.',cat:'work',important:true,reply:true},
+    {from:'대한물산 구매팀 <purchase@daehan.co.kr>',subj:'납품 계약서 검토 요청드립니다',snip:'첨부된 납품 계약서 검토 후 회신 부탁드립니다. 단가 조건 확인이 필요합니다.',cat:'work',important:true,reply:true},
+    {from:'정보보안팀 <security@company.com>',subj:'[필수] 정보보안 교육 이수 마감 안내',snip:'전 직원 정보보안 교육 이수 마감이 이번 주 금요일입니다. 미이수 시 계정이 제한됩니다.',cat:'work',important:true,reply:false},
+    {from:'박지원 책임 <jiwon.park@company.com>',subj:'프로젝트 진행상황 공유 (주간)',snip:'이번 주 개발 진행상황과 다음 주 일정 공유드립니다. 확인 부탁드려요.',cat:'work',important:false,reply:true},
+    {from:'쿠팡 <no-reply@coupang.com>',subj:'[배송] 주문하신 상품이 출발했어요',snip:'고객님이 주문하신 상품이 오늘 출고되어 내일 도착 예정입니다.',cat:'personal',important:false,reply:false},
+    {from:'신한카드 <statement@shinhancard.com>',subj:'6월 카드 이용대금 명세서 안내',snip:'6월 청구금액은 482,300원이며 결제 예정일은 7월 14일입니다.',cat:'personal',important:false,reply:false},
+    {from:'동창회 총무 김우진 <woojin.alumni@gmail.com>',subj:'이번 주 토요일 동창 모임 장소 안내',snip:'토요일 저녁 7시 강남역 OO식당입니다. 참석 여부 회신 주세요!',cat:'personal',important:false,reply:true},
+    {from:'특가알림 <promo@deal-shop.net>',subj:'★오늘만★ 전 상품 90% 폭탄 세일!',snip:'지금 클릭하면 추가 쿠폰까지! 한정 수량 마감 임박.',cat:'spam',important:false,reply:false},
+    {from:'경품센터 <win@lucky-event.biz>',subj:'🎉 축하합니다! 경품에 당첨되셨습니다',snip:'아래 링크에서 본인 인증 후 상품을 수령하세요.',cat:'spam',important:false,reply:false},
+    {from:'프리미엄클럽 <ad@vip-casino.xyz>',subj:'[광고] 가입 즉시 100만원 무료 지급',snip:'신규 가입 회원 한정 이벤트! 지금 바로 신청하세요.',cat:'spam',important:false,reply:false},
   ]
 };
 
@@ -707,17 +709,12 @@ function DEMO_WEEKLY(tone){
    ========================================================= */
 $('#t-run').addEventListener('click',async()=>{
   const c=$('#t-result');
-  const out=await runSteps(c,['안 읽은 메일 검색','업무·개인·스팸 분류','중요 발신자·긴급 키워드 표시','스팸 정리','요약 보고서 작성·발송'],async(i,o)=>{
-    if(S.mode==='demo'){await sleep(620); if(i===0)o.mails=JSON.parse(JSON.stringify(MOCK.mails)); return;}
-    if(i===0){
-      const ids=await gmailSearch('is:unread newer_than:1d');
-      o.mails=[];
-      for(const m of ids.slice(0,15)){const d=await gmailGet(m.id);const h=k=>(d.payload.headers.find(x=>x.name===k)||{}).value||'';o.mails.push({id:m.id,from:h('From'),subj:h('Subject'),snip:d.snippet||'',cat:'work',important:false,reply:false});}
-    }
+  const out=await runSteps(c,['메일 불러오기','업무·개인·스팸 AI 분류','중요 발신자·긴급 키워드 표시','카카오톡 알림 발송','요약 보고서 작성'],async(i,o)=>{
+    if(i===0){o.mails=JSON.parse(JSON.stringify(MOCK.mails)); await sleep(500);}
     if(i===1){
       for(const m of o.mails){
         const sys='메일을 work/personal/spam 중 하나로 분류하고 답장 필요 여부를 판단. JSON {cat, reply} 로만 답하라.';
-        try{const t=await callLLM(sys,'From:'+m.from+'\nSubject:'+m.subj+'\n'+m.snip);const j=JSON.parse(t.replace(/```json|```/g,'').trim());m.cat=j.cat;m.reply=j.reply;}catch(e){}
+        try{const t=await callLLM(sys,'From:'+m.from+'\nSubject:'+m.subj+'\n'+m.snip);const j=JSON.parse(t.replace(/```json|```/g,'').trim());if(j.cat)m.cat=j.cat;if('reply' in j)m.reply=!!j.reply;}catch(e){}
       }
     }
     if(i===2){
@@ -727,17 +724,12 @@ $('#t-run').addEventListener('click',async()=>{
         m.important = m.cat!=='spam' && (fromImp||kwImp);
       });
     }
-    if(i===3 && S.mode==='live'){for(const m of o.mails.filter(x=>x.cat==='spam')){try{await gmailTrash(m.id);}catch(e){}}}
-    if(i===4 && S.mode==='live'){
-      const rep='안읽음 '+o.mails.length+'건 / 중요 '+o.mails.filter(m=>m.important).length+'건 / 스팸 '+o.mails.filter(m=>m.cat==='spam').length+'건 삭제';
-      try{await gmailSend('me','[메일정리] '+new Date().toLocaleDateString(),rep);}catch(e){}
-    }
+    if(i===3){ o.kakao=o.mails.filter(m=>S.watchedSenders.some(s=>m.from.includes(s))); await sleep(600); }
+    if(i===4){ await sleep(400); }
   });
-  // demo flag importance even if classify step skipped
-  if(S.mode==='demo'){out.mails.forEach(m=>{const fromImp=S.importantSenders.some(s=>m.from.includes(s));const kwImp=S.urgentKeywords.some(k=>(m.subj+m.snip).includes(k));if(m.cat!=='spam'&&(fromImp||kwImp))m.important=true;});}
-  renderTriage(c,out.mails);
+  renderTriage(c,out.mails,out.kakao||[]);
 });
-function renderTriage(c,mails){
+function renderTriage(c,mails,kakao){
   const work=mails.filter(m=>m.cat==='work'), personal=mails.filter(m=>m.cat==='personal'), spam=mails.filter(m=>m.cat==='spam');
   const important=mails.filter(m=>m.important), reply=mails.filter(m=>m.reply);
   c.innerHTML='';
@@ -746,9 +738,14 @@ function renderTriage(c,mails){
   b.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+
     '<span class="chip work">업무 '+work.length+'</span>'+
     '<span class="chip personal">개인 '+personal.length+'</span>'+
-    '<span class="chip spam">스팸 '+spam.length+' '+(S.mode==='live'?'(삭제됨)':'(삭제 대상)')+'</span>'+
+    '<span class="chip spam">스팸 '+spam.length+'</span>'+
     '<span class="chip important">⭐ 중요 '+important.length+'</span>'+
     '<span class="chip" style="background:#222a3d;color:var(--muted)">↩ 답장필요 '+reply.length+'</span></div>';
+  if(kakao&&kakao.length){
+    const kb=el('div'); kb.style.cssText='background:rgba(255,181,71,.1);border:1px solid rgba(255,181,71,.35);border-left:3px solid var(--warn);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px';
+    kb.innerHTML='📲 <b>카카오톡 알림 발송됨</b> — 감시 발신자 '+kakao.length+'명: '+kakao.map(m=>esc(m.from.replace(/<[^>]*>/,'').trim())).join(', ')+'<div style="color:var(--faint);margin-top:4px">중요 발신자 메일 도착 즉시 카카오톡으로 통보합니다.</div>';
+    b.appendChild(kb);
+  }
   if(important.length){
     b.appendChild(el('h4',null,'⭐ 중요 — 우선 확인'));
     const list=el('div','maillist');
@@ -759,8 +756,16 @@ function renderTriage(c,mails){
   const all=el('div','maillist');
   mails.forEach(m=>all.appendChild(mailRow(m)));
   b.appendChild(all);
-  const btn=el('button','btn primary','✉ 요약 보고서 내 메일로 받기');btn.style.marginTop='16px';
-  btn.onclick=async()=>{btn.disabled=true;btn.innerHTML='<span class="loader"></span>';await sleep(700);btn.innerHTML='✓ 발송 완료';toast('✓ 메일 요약 보고서를 보냈습니다');};
+  const btn=el('button','btn primary','✉ 중요 메일 요약 내 메일로 받기');btn.style.marginTop='16px';
+  btn.onclick=async()=>{
+    btn.disabled=true;btn.innerHTML='<span class="loader"></span> 발송 중…';
+    try{
+      const body='[메일 자동 정리 요약]\n\n업무 '+work.length+' · 개인 '+personal.length+' · 스팸 '+spam.length+' · 중요 '+important.length+'건\n\n[중요 메일 '+important.length+'건]\n'+important.map(m=>'- '+m.subj+'  ('+m.from+')').join('\n');
+      if(S.mode==='live'){await gmailSend('me','[메일정리 요약] '+new Date().toLocaleDateString(),body);}
+      else await sleep(700);
+      btn.innerHTML='✓ 내 메일로 발송 완료';toast('✓ 요약 보고서를 메일로 보냈습니다');
+    }catch(e){btn.disabled=false;btn.innerHTML='✉ 다시 보내기';toast('⚠ '+e.message);}
+  };
   b.appendChild(btn);
   c.appendChild(b);
 }
