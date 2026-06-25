@@ -552,13 +552,13 @@ $('#m-transcribe').addEventListener('click',async()=>{
   if(!S.gemini.key){toast('⚠ 음성 변환은 Gemini 키가 필요합니다 (설정 → Gemini API 키)');return;}
   btn.disabled=true;btn.innerHTML='<span class="loader"></span> 변환 중…';
   try{
-    const wavB64=await fileToWavBase64(audioFile);
+    if(audioFile.size>14680064)throw new Error('파일이 큽니다(~14MB↑). 10분 이내로 잘라 주세요');let mime=audioFile.type||'audio/mp4';if(/m4a|mp4/i.test(mime))mime='audio/mp4';const b64=await fileToB64(audioFile);
     const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',{
       method:'POST',
       headers:{'content-type':'application/json','x-goog-api-key':S.gemini.key},
       body:JSON.stringify({contents:[{parts:[
         {text:'다음 오디오는 회의 녹음입니다. 들리는 내용을 한국어로 정확히 받아써 주세요. 가능하면 화자를 구분해 표시하고, 군더더기(음, 어)는 정리하세요. 전사 텍스트만 출력하고 다른 설명은 붙이지 마세요.'},
-        {inlineData:{mimeType:'audio/wav',data:wavB64}}
+        {inlineData:{mimeType:mime,data:b64}}
       ]}]})
     });
     const j=await r.json(); if(j.error)throw new Error(j.error.message||'Gemini 오류');
@@ -569,7 +569,7 @@ $('#m-transcribe').addEventListener('click',async()=>{
   btn.disabled=false;btn.innerHTML='🎧 텍스트로 변환';
 });
 // 오디오 파일 → 16kHz mono WAV(base64). 브라우저가 디코드 가능한 모든 포맷(m4a/mp3/wav 등) 지원.
-async function fileToWavBase64(file){
+function fileToB64(file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]);fr.onerror=()=>rej(new Error('읽기 실패'));fr.readAsDataURL(file);});} async function fileToWavBase64(file){
   const buf=await file.arrayBuffer();
   const ac=new (window.AudioContext||window.webkitAudioContext)();
   const decoded=await ac.decodeAudioData(buf);
