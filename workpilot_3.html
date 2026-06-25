@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WorkPilot — AI 업무 자동화 비서</title>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<style>
+  :root{
+    --bg:#0b0d12; --surface:#141821; --surface-2:#1b2030; --line:#262c3a;
+    --text:#e7eaf0; --muted:#9aa3b5; --faint:#646d80;
+    --brand:#6c8cff; --brand-2:#8a6cff; --ok:#3ecf8e; --warn:#ffb547; --danger:#ff6b6b;
+    --radius:14px; --shadow:0 10px 40px rgba(0,0,0,.35);
+    --font:'Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,#1a1f33 0%,var(--bg) 55%);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;line-height:1.5}
+  a{color:var(--brand)}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+  /* Header */
+  header{position:sticky;top:0;z-index:30;backdrop-filter:blur(12px);background:rgba(11,13,18,.7);border-bottom:1px solid var(--line)}
+  .bar{display:flex;align-items:center;gap:16px;padding:14px 0}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.02em}
+  .logo .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-2));display:grid;place-items:center;font-size:16px;box-shadow:0 4px 14px rgba(108,140,255,.4)}
+  .spacer{flex:1}
+  .mode-toggle{display:flex;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px}
+  .mode-toggle button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px;cursor:pointer;transition:.15s}
+  .mode-toggle button.active{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff}
+  .btn{border:1px solid var(--line);background:var(--surface-2);color:var(--text);font-weight:600;font-size:13px;padding:9px 14px;border-radius:10px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{border-color:var(--brand)}
+  .btn.primary{background:linear-gradient(135deg,var(--brand),var(--brand-2));border:0;color:#fff;box-shadow:0 6px 18px rgba(108,140,255,.35)}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.danger{color:var(--danger);border-color:#3a2330}
+  .btn.ghost{background:transparent}
+
+  /* Hero / tabs */
+  .hero{padding:34px 0 10px}
+  .hero h1{font-size:30px;margin:0 0 6px;letter-spacing:-.03em}
+  .hero p{color:var(--muted);margin:0;max-width:680px}
+  .modepill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;margin-left:10px;vertical-align:middle}
+  .modepill.demo{background:rgba(62,207,142,.12);color:var(--ok);border:1px solid rgba(62,207,142,.3)}
+  .modepill.live{background:rgba(255,107,107,.12);color:var(--danger);border:1px solid rgba(255,107,107,.3)}
+
+  .tabs{display:flex;gap:8px;margin:24px 0 0;flex-wrap:wrap}
+  .tab{display:flex;align-items:center;gap:9px;padding:13px 18px;border-radius:12px 12px 0 0;border:1px solid transparent;border-bottom:0;cursor:pointer;color:var(--muted);font-weight:600;transition:.15s;background:transparent}
+  .tab .num{width:22px;height:22px;border-radius:7px;background:var(--surface-2);display:grid;place-items:center;font-size:12px;color:var(--faint)}
+  .tab.active{background:var(--surface);border-color:var(--line);color:var(--text)}
+  .tab.active .num{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:0 14px 14px 14px;padding:26px;min-height:420px;box-shadow:var(--shadow)}
+  .panel h2{margin:0 0 4px;font-size:20px;letter-spacing:-.02em}
+  .panel .sub{color:var(--muted);font-size:14px;margin:0 0 22px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}}
+  .field{margin-bottom:16px}
+  label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:7px}
+  input[type=text],input[type=email],input[type=time],input[type=password],textarea,select{
+    width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:11px 13px;font-family:var(--font);font-size:14px;outline:none;transition:.15s}
+  input:focus,textarea:focus,select:focus{border-color:var(--brand);background:#1d2333}
+  textarea{resize:vertical;min-height:150px;line-height:1.6}
+  .hint{font-size:12px;color:var(--faint);margin-top:6px}
+
+  .card{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px}
+
+  .result{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:0;overflow:hidden}
+  .result-head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line);background:#11151f;font-weight:700;font-size:14px}
+  .result-body{padding:18px;font-size:14px}
+  .result-body h4{margin:18px 0 8px;font-size:14px;color:var(--brand)}
+  .result-body h4:first-child{margin-top:0}
+  .result-body ul{margin:0;padding-left:18px}
+  .result-body li{margin:5px 0}
+  .empty{display:grid;place-items:center;height:280px;color:var(--faint);text-align:center;gap:10px}
+  .empty .ico{font-size:34px;opacity:.5}
+
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;margin:2px}
+  .chip.work{background:rgba(108,140,255,.15);color:#9db0ff}
+  .chip.personal{background:rgba(62,207,142,.15);color:#6fe0aa}
+  .chip.spam{background:rgba(255,107,107,.15);color:#ff9a9a}
+  .chip.important{background:rgba(255,181,71,.18);color:#ffce85}
+
+  .tag-input{display:flex;flex-wrap:wrap;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .tag-input input{border:0!important;background:transparent!important;flex:1;min-width:120px;padding:4px}
+  .tag{display:inline-flex;align-items:center;gap:6px;background:#222a3d;border:1px solid var(--line);border-radius:7px;padding:4px 9px;font-size:13px}
+  .tag b{cursor:pointer;color:var(--faint)}
+  .tag b:hover{color:var(--danger)}
+
+  .maillist{display:flex;flex-direction:column;gap:8px}
+  .mailrow{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+  .mailrow .from{font-weight:700;font-size:13px}
+  .mailrow .subj{font-size:13px;color:var(--text)}
+  .mailrow .snip{font-size:12px;color:var(--faint);margin-top:3px}
+  .mailrow.del{opacity:.55;border-style:dashed}
+
+  .loader{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .steps{display:flex;flex-direction:column;gap:9px;margin:6px 0}
+  .step{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+  .step .dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:11px;flex-shrink:0}
+  .step.done .dot{background:var(--ok);border-color:var(--ok);color:#06281a}
+  .step.active .dot{border-color:var(--brand)}
+  .step.active{color:var(--text)}
+
+  /* Modal */
+  .overlay{position:fixed;inset:0;background:rgba(5,7,12,.7);backdrop-filter:blur(4px);display:none;place-items:center;z-index:60;padding:20px}
+  .overlay.open{display:grid}
+  .modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;max-width:520px;width:100%;box-shadow:var(--shadow);max-height:90vh;overflow:auto}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line)}
+  .modal-head h3{margin:0;font-size:17px}
+  .modal-body{padding:22px}
+  .x{background:transparent;border:0;color:var(--faint);font-size:22px;cursor:pointer;line-height:1}
+  .divider{height:1px;background:var(--line);margin:18px 0}
+  .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+  .status-dot.on{background:var(--ok)} .status-dot.off{background:var(--faint)}
+  .note{font-size:12px;color:var(--faint);background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;padding:10px 12px;margin-top:14px}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120%);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 18px;font-size:14px;font-weight:600;box-shadow:var(--shadow);z-index:80;transition:.3s;display:flex;align-items:center;gap:9px}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  footer{color:var(--faint);font-size:12px;text-align:center;padding:30px 0 50px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap bar">
+    <div class="logo"><span class="mark">✦</span> WorkPilot</div>
+    <span class="spacer"></span>
+    <div class="mode-toggle" id="modeToggle">
+      <button data-mode="demo" class="active">데모 모드</button>
+      <button data-mode="live">실연동 모드</button>
+    </div>
+    <button class="btn" id="settingsBtn">⚙ 설정</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>AI 업무 자동화 비서 <span class="modepill demo" id="modePill">● 데모 모드</span></h1>
+    <p>회의록 작성, 주간 보고, 메일 정리 — 직장인이 매일 반복하는 일을 AI가 대신합니다. Gmail·캘린더에 실제 연동되며, 결과는 그대로 메일로 발송됩니다.</p>
+  </section>
+
+  <nav class="tabs" id="tabs">
+    <div class="tab active" data-tab="meeting"><span class="num">1</span> 회의록 자동화</div>
+    <div class="tab" data-tab="weekly"><span class="num">2</span> 주간 업무 보고</div>
+    <div class="tab" data-tab="triage"><span class="num">3</span> 메일 자동 정리</div>
+  </nav>
+
+  <!-- ===== TAB 1: MEETING ===== -->
+  <section class="panel" id="tab-meeting">
+    <h2>회의록 자동화</h2>
+    <p class="sub">회의 녹취록(또는 음성→텍스트 결과)을 붙여넣으면 AI가 안건·결정사항·액션아이템으로 정리하고, 참가자 전원에게 메일로 보냅니다.</p>
+    <div class="grid">
+      <div>
+        <div class="field">
+          <label>회의 제목</label>
+          <input type="text" id="m-title" placeholder="예: 3분기 마케팅 전략 킥오프" />
+        </div>
+        <div class="field">
+          <label>참가자 이메일</label>
+          <div class="tag-input" id="m-attendees-box">
+            <input type="text" id="m-attendees-input" placeholder="이메일 입력 후 Enter" />
+          </div>
+          <div class="hint">회의록 완성 시 이 주소로 일괄 발송됩니다.</div>
+        </div>
+        <div class="field">
+          <label>🎙 녹음 파일 (선택)</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label class="btn ghost" style="cursor:pointer">파일 선택<input type="file" id="m-audio" accept="audio/*" style="display:none" /></label>
+            <span id="m-audio-name" class="hint" style="margin:0">선택된 파일 없음</span>
+            <button class="btn" id="m-transcribe">🎧 텍스트로 변환</button>
+          </div>
+          <div class="hint">녹음을 올리면 AI가 받아쓰기(STT) 후 아래 칸을 채웁니다. (실연동: OpenAI Whisper)</div>
+        </div>
+        <div class="field">
+          <label>회의 녹취록 / 메모</label>
+          <textarea id="m-transcript" placeholder="회의 내용을 붙여넣거나, 위에서 녹음 파일을 변환하세요."></textarea>
+        </div>
+        <button class="btn primary" id="m-run">✦ 회의록 생성</button>
+      </div>
+      <div>
+        <div class="result" id="m-result">
+          <div class="empty"><div class="ico">📝</div><div>왼쪽에 녹취록을 넣고<br/><b>회의록 생성</b>을 눌러보세요.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== TAB 2: WEEKLY ===== -->
+  <section class="panel" id="tab-weekly" style="display:none">
+    <h2>주간 업무 보고</h2>
+    <p class="sub">이번 주 캘린더 일정과 주고받은 메일을 모아 AI가 <b>주간 실적</b>과 <b>차주 계획</b>을 자동으로 도출합니다.</p>
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h3>📥 수집할 데이터</h3>
+          <div class="field" style="margin-bottom:12px">
+            <label>대상 기간</label>
+            <select id="w-period">
+              <option value="this">이번 주 (월~금)</option>
+              <option value="last">지난 주</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>보고 대상 / 어조</label>
+            <select id="w-tone">
+              <option value="boss">팀장 보고용 (격식체)</option>
+              <option value="team">팀 공유용 (간결체)</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <button class="btn primary" id="w-run">✦ 이번 주 데이터 가져와 보고서 작성</button>
+        </div>
+        <div id="w-sources" style="margin-top:16px"></div>
+      </div>
+      <div>
+        <div class="result" id="w-result">
+          <div class="empty"><div class="ico">📊</div><div>버튼을 누르면 캘린더·메일을<br/>분석해 주간 보고서를 만듭니다.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== TAB 3: TRIAGE ===== -->
+  <section class="panel" id="tab-triage" style="display:none">
+    <h2>메일 자동 정리</h2>
+    <p class="sub">매일 아침, 안 읽은 메일을 업무·개인·스팸으로 분류하고 중요 메일을 추려 요약 보고서를 본인에게 발송합니다.</p>
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h3>⏰ 실행 스케줄</h3>
+          <div style="display:flex;gap:12px">
+            <div class="field" style="flex:1;margin:0">
+              <label>매일 실행 시각</label>
+              <input type="time" id="t-time" value="09:00" />
+            </div>
+            <div class="field" style="flex:1;margin:0">
+              <label>상태</label>
+              <select id="t-enabled"><option value="on">활성</option><option value="off">중지</option></select>
+            </div>
+          </div>
+          <div class="note">웹페이지는 닫히면 동작하지 않으므로, 실제 배포 시엔 서버 크론(예: Cloud Scheduler)이 이 파이프라인을 호출합니다. 아래 <b>지금 실행</b>으로 동일 로직을 즉시 테스트할 수 있습니다.</div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <h3>⭐ 중요 발신자 <span style="font-weight:400;color:var(--faint);font-size:12px">(변수)</span></h3>
+          <div class="tag-input" id="t-senders-box"><input type="text" id="t-senders-input" placeholder="이메일 입력 후 Enter" /></div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h3>🚨 긴급 키워드 <span style="font-weight:400;color:var(--faint);font-size:12px">(변수)</span></h3>
+          <div class="tag-input" id="t-keywords-box"><input type="text" id="t-keywords-input" placeholder="키워드 입력 후 Enter" /></div>
+        </div>
+        <div style="margin-top:16px">
+          <button class="btn primary" id="t-run">✦ 지금 실행</button>
+        </div>
+      </div>
+      <div>
+        <div class="result" id="t-result">
+          <div class="empty"><div class="ico">📬</div><div>안 읽은 메일을 분류하고<br/>요약 보고서를 만들어 발송합니다.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>WorkPilot · 단일 페이지 AI 자동화 데모 · 데모 모드는 설정 없이 즉시 작동합니다</footer>
+
+<!-- Settings Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head"><h3>⚙ 설정</h3><button class="x" id="closeSettings">×</button></div>
+    <div class="modal-body">
+      <div class="field">
+        <label>실행 모드</label>
+        <div style="color:var(--muted);font-size:13px">현재: <b id="s-mode-label">데모 모드</b> — 상단 토글로 전환합니다.</div>
+      </div>
+      <div class="divider"></div>
+
+      <h3 style="margin:0 0 4px;font-size:15px">🔗 Google 연결 (Gmail · 캘린더)</h3>
+      <p class="hint" style="margin:0 0 12px">실연동 모드에서 본인 계정의 메일/일정을 읽고 보냅니다.</p>
+      <div class="field">
+        <label>Google OAuth Client ID</label>
+        <input type="text" id="s-gclient" placeholder="xxxxxx.apps.googleusercontent.com" />
+        <div class="hint">Google Cloud Console에서 발급. 발급 방법은 함께 드린 가이드를 참고하세요.</div>
+      </div>
+      <button class="btn" id="s-gconnect"><span class="status-dot off" id="g-dot"></span>Google 계정 연결</button>
+      <span id="g-status" style="font-size:13px;color:var(--muted);margin-left:10px"></span>
+
+      <div class="divider"></div>
+      <h3 style="margin:0 0 4px;font-size:15px">🤖 AI 모델</h3>
+      <div class="field">
+        <label>제공자</label>
+        <select id="s-provider">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="openai">OpenAI (GPT)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>API Key</label>
+        <input type="password" id="s-apikey" placeholder="sk-..." />
+        <div class="hint">키는 이 브라우저 메모리에만 보관되며 서버로 전송되지 않습니다.</div>
+      </div>
+      <div class="note">⚠ 브라우저에서 직접 LLM을 호출하면 API 키가 네트워크 요청에 노출됩니다. 개인 포트폴리오 데모엔 무방하지만, 실제 서비스라면 키 호출은 백엔드로 옮겨야 합니다.</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   WorkPilot — single-file AI work automation demo
+   데모 모드: 목업 데이터로 즉시 작동 (설정 불필요)
+   실연동 모드: Google OAuth(GIS+gapi) + LLM API 직접 호출
+   ========================================================= */
+const S = {
+  mode: 'demo',
+  google: { clientId:'', token:null, ready:false },
+  llm: { provider:'anthropic', key:'' },
+  meetingAttendees: [],
+  importantSenders: ['noreply@github.com','notifications@vercel.com'],
+  urgentKeywords: ['로그인','sign-in','승인','계약','마감','긴급'],
+};
+
+/* ---------- tiny helpers ---------- */
+const $ = s => document.querySelector(s);
+const el = (t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const esc = s => String(s).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+function toast(msg){const t=$('#toast');t.innerHTML=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200);}
+
+/* ---------- mode + tabs + settings wiring ---------- */
+$('#modeToggle').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  S.mode=b.dataset.mode;
+  [...$('#modeToggle').children].forEach(x=>x.classList.toggle('active',x===b));
+  const pill=$('#modePill');
+  pill.className='modepill '+S.mode;
+  pill.textContent = S.mode==='demo' ? '● 데모 모드' : '● 실연동 모드';
+  $('#s-mode-label').textContent = S.mode==='demo' ? '데모 모드' : '실연동 모드';
+  if(S.mode==='live' && !S.llm.key){ toast('⚠ 실연동 모드: 설정에서 Google 연결과 API 키를 입력하세요'); }
+});
+$('#tabs').addEventListener('click',e=>{
+  const t=e.target.closest('.tab'); if(!t)return;
+  [...$('#tabs').children].forEach(x=>x.classList.toggle('active',x===t));
+  ['meeting','weekly','triage'].forEach(n=>$('#tab-'+n).style.display = (n===t.dataset.tab)?'block':'none');
+});
+$('#settingsBtn').addEventListener('click',()=>$('#overlay').classList.add('open'));
+$('#closeSettings').addEventListener('click',()=>$('#overlay').classList.remove('open'));
+$('#overlay').addEventListener('click',e=>{if(e.target===$('#overlay'))$('#overlay').classList.remove('open');});
+$('#s-provider').addEventListener('change',e=>S.llm.provider=e.target.value);
+$('#s-apikey').addEventListener('input',e=>S.llm.key=e.target.value.trim());
+$('#s-gclient').addEventListener('input',e=>S.google.clientId=e.target.value.trim());
+
+/* ---------- tag inputs ---------- */
+function setupTags(boxSel,inputSel,arr,render){
+  const box=$(boxSel), input=$(inputSel);
+  function draw(){
+    box.querySelectorAll('.tag').forEach(t=>t.remove());
+    arr.forEach((v,i)=>{
+      const tag=el('span','tag',esc(v)+' <b data-i="'+i+'">×</b>');
+      box.insertBefore(tag,input);
+    });
+  }
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&input.value.trim()){arr.push(input.value.trim());input.value='';draw();}
+    if(e.key==='Backspace'&&!input.value&&arr.length){arr.pop();draw();}
+  });
+  box.addEventListener('click',e=>{
+    if(e.target.tagName==='B'){arr.splice(+e.target.dataset.i,1);draw();}
+    else input.focus();
+  });
+  draw();
+}
+setupTags('#m-attendees-box','#m-attendees-input',S.meetingAttendees);
+setupTags('#t-senders-box','#t-senders-input',S.importantSenders);
+setupTags('#t-keywords-box','#t-keywords-input',S.urgentKeywords);
+
+/* ---------- progress UI ---------- */
+async function runSteps(container,labels,worker){
+  const wrap=el('div','result-body');
+  const head=el('div','result-head','<span class="loader"></span> 처리 중…');
+  container.innerHTML=''; container.appendChild(head); container.appendChild(wrap);
+  const stepsEl=el('div','steps'); wrap.appendChild(stepsEl);
+  const nodes=labels.map(l=>{const s=el('div','step','<span class="dot"></span>'+esc(l));stepsEl.appendChild(s);return s;});
+  const out={};
+  for(let i=0;i<labels.length;i++){
+    nodes[i].classList.add('active');
+    await worker(i,out);
+    nodes[i].classList.remove('active');nodes[i].classList.add('done');
+    nodes[i].querySelector('.dot').textContent='✓';
+  }
+  return out;
+}
+
+/* =========================================================
+   LLM call — live mode hits the real API
+   ========================================================= */
+async function callLLM(system,user){
+  if(S.mode==='demo') throw new Error('demo');
+  if(!S.llm.key) throw new Error('API 키가 없습니다. 설정에서 입력하세요.');
+  if(S.llm.provider==='anthropic'){
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'content-type':'application/json','x-api-key':S.llm.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-3-5-sonnet-latest',max_tokens:2000,system,messages:[{role:'user',content:user}]})
+    });
+    const j=await r.json(); if(j.error)throw new Error(j.error.message);
+    return j.content[0].text;
+  }else{
+    const r=await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'content-type':'application/json','authorization':'Bearer '+S.llm.key},
+      body:JSON.stringify({model:'gpt-4o',messages:[{role:'system',content:system},{role:'user',content:user}]})
+    });
+    const j=await r.json(); if(j.error)throw new Error(j.error.message);
+    return j.choices[0].message.content;
+  }
+}
+
+/* =========================================================
+   GOOGLE — Gmail / Calendar (live mode)
+   ========================================================= */
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+async function ensureGoogle(){
+  if(!window.google) await loadScript('https://accounts.google.com/gsi/client');
+  if(!window.gapi) await loadScript('https://apis.google.com/js/api.js');
+  await new Promise(r=>gapi.load('client',r));
+  await gapi.client.init({discoveryDocs:[
+    'https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest',
+    'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest']});
+}
+$('#s-gconnect').addEventListener('click',async()=>{
+  if(!S.google.clientId){toast('⚠ 먼저 OAuth Client ID를 입력하세요');return;}
+  try{
+    $('#g-status').textContent='연결 중…';
+    await ensureGoogle();
+    const tc=google.accounts.oauth2.initTokenClient({
+      client_id:S.google.clientId,
+      scope:'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/calendar.readonly',
+      callback:resp=>{
+        if(resp.error){$('#g-status').textContent='실패: '+resp.error;return;}
+        S.google.token=resp.access_token; S.google.ready=true;
+        gapi.client.setToken({access_token:resp.access_token});
+        $('#g-dot').className='status-dot on'; $('#g-status').textContent='✓ 연결됨';
+        toast('✓ Google 계정 연결 완료');
+      }});
+    tc.requestAccessToken();
+  }catch(err){$('#g-status').textContent='오류: '+err.message;}
+});
+// Real Gmail/Calendar helpers (used in live mode)
+async function gmailSearch(q){const r=await gapi.client.gmail.users.messages.list({userId:'me',q,maxResults:25});return r.result.messages||[];}
+async function gmailGet(id){const r=await gapi.client.gmail.users.messages.get({userId:'me',id,format:'metadata',metadataHeaders:['From','Subject','Date']});return r.result;}
+async function gmailSend(to,subject,body){
+  const raw=btoa(unescape(encodeURIComponent(
+    'To: '+to+'\r\nSubject: =?UTF-8?B?'+btoa(unescape(encodeURIComponent(subject)))+'?=\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n'+body
+  ))).replace(/\+/g,'-').replace(/\//g,'_');
+  return gapi.client.gmail.users.messages.send({userId:'me',resource:{raw}});
+}
+async function gmailTrash(id){return gapi.client.gmail.users.messages.trash({userId:'me',id});}
+async function calendarThisWeek(){
+  const now=new Date();const day=now.getDay()||7;const mon=new Date(now);mon.setDate(now.getDate()-day+1);mon.setHours(0,0,0,0);
+  const sun=new Date(mon);sun.setDate(mon.getDate()+6);sun.setHours(23,59,59);
+  const r=await gapi.client.calendar.events.list({calendarId:'primary',timeMin:mon.toISOString(),timeMax:sun.toISOString(),singleEvents:true,orderBy:'startTime'});
+  return r.result.items||[];
+}
+
+/* =========================================================
+   MOCK DATA (demo mode)
+   ========================================================= */
+const MOCK = {
+  transcript:`(자동 채움) 오늘 3분기 마케팅 전략 킥오프 회의 시작하겠습니다.
+김민지: 2분기 신규 가입 전환율이 2.9%에서 3.8%로 올랐는데, 상세페이지 개편 효과로 봅니다.
+이준호: 다음 분기엔 퍼포먼스 광고 예산을 20% 늘리자는 제안이 있었고, 박서연 책임이 채널별 ROAS 분석을 다음 주 수요일까지 정리하기로 했습니다.
+박서연: 네, 수요일까지 ROAS 리포트 공유하겠습니다. 인스타 릴스 비중을 늘리는 방향도 검토 중입니다.
+김민지: 신규 랜딩페이지 A/B 테스트는 제가 이번 주 금요일까지 셋업하겠습니다.
+이준호: 좋습니다. 그리고 인플루언서 협업 건은 예산 승인이 필요해서 팀장님 컨펌 받고 진행하기로 합의했습니다.`,
+  meetingResult:{
+    summary:'3분기 마케팅 전략 방향을 확정하고, 퍼포먼스 광고 예산 증액과 신규 랜딩페이지 A/B 테스트, 인플루언서 협업을 핵심 과제로 합의함.',
+    agenda:['2분기 성과 리뷰','3분기 광고 예산 배분','신규 랜딩페이지 A/B 테스트','인플루언서 협업 추진'],
+    decisions:['퍼포먼스 광고 예산 20% 증액 방향 합의','인스타 릴스 비중 확대 검토','인플루언서 협업은 팀장 예산 승인 후 진행'],
+    actions:[
+      {task:'채널별 ROAS 분석 리포트 공유',owner:'박서연',due:'다음 주 수요일'},
+      {task:'신규 랜딩페이지 A/B 테스트 셋업',owner:'김민지',due:'이번 주 금요일'},
+      {task:'인플루언서 협업 예산 승인 요청',owner:'이준호',due:'금주 내'},
+    ]
+  },
+  calEvents:[
+    '월 10:00 3분기 마케팅 킥오프','월 15:00 디자인팀 싱크','화 11:00 신규 채용 면접',
+    '수 14:00 ROAS 리뷰','목 10:30 대행사 미팅','금 16:00 주간 회고'],
+  // ── 실제 받은편지함 스냅샷 (2026-06-25, 안 읽은 메일 25건 중 대표 15건을 AI가 분류) ──
+  mails:[
+    {from:'GitHub <noreply@github.com>',subj:'[GitHub] Sign-in from an unrecognized location',snip:'Your GitHub account was successfully signed in to but we did not recognize the location...',cat:'work',important:true,reply:false},
+    {from:'Vercel <notifications@vercel.com>',subj:'New sign-in detected on your Vercel account',snip:'Your Vercel account was recently signed-in from a new location: Geoje-si, Gyeongsangnam-do...',cat:'work',important:true,reply:false},
+    {from:'Google <no-reply@accounts.google.com>',subj:'새로운 계정 로그인 알림',snip:'내 Google 계정에 새로 로그인했습니다. 본인이 아니라면 안내에 따라 계정을 보호하세요...',cat:'personal',important:true,reply:false},
+    {from:'GitHub <noreply@github.com>',subj:'A third-party OAuth application (Upstash) was authorized',snip:'A third-party OAuth application with read:user and user:email scopes was authorized...',cat:'work',important:true,reply:false},
+    {from:'제약기술재단 <edu@kpti.or.kr>',subj:'2026년 하반기 GMP 교육과정 및 자격시험·VOD 안내',snip:'제약·바이오 산업 종사자 실무역량 강화를 위한 정기세미나 및 자격시험 일정 안내...',cat:'work',important:false,reply:true},
+    {from:'Anthropic <invoice+statements@anthropic.com>',subj:'Your receipt from Anthropic, PBC #2890-9359-1378',snip:'Receipt for your recent payment...',cat:'personal',important:false,reply:false},
+    {from:'Anthropic <noreply@anthropic.com>',subj:'Thanks for starting your Pro subscription, Mj',snip:'Your payment method has been charged. The next charge will be on Jun 24, 2027...',cat:'personal',important:false,reply:false},
+    {from:'KG이니시스 <noreply@inicis.com>',subj:'[결제내역 안내] (주)에스씨케이컴퍼니 6,700원',snip:'성민제 고객님이 KG이니시스 결제시스템을 통해 결제하신 내역입니다. 결제금액 6,700원...',cat:'personal',important:false,reply:false},
+    {from:'Upstash <noreply@upstash.com>',subj:'Welcome to Upstash',snip:'Check out our blog posts and documents to dive right into serverless use cases...',cat:'work',important:false,reply:false},
+    {from:'Google Cloud <cloud-noreply@google.com>',subj:'Google Cloud 시작하기',snip:'빠르게 시작하고 Google Cloud에서 제공되는 기능을 살펴보세요...',cat:'work',important:false,reply:false},
+    {from:'오픈서베이 <marketing@opensurvey.co.kr>',subj:'데이터스페이스 AI로 리서치를 더 빠르게',snip:'설문 설계부터 응답 수집까지 하루면 충분합니다...',cat:'spam',important:false,reply:false},
+    {from:'잇다 <newsletter@itdaa.net>',subj:'잇다 뉴스 📊 / SK하이닉스, AI 인재는 이런 사람',snip:'1. 경제 뉴스 2. 채용 뉴스 3. 온라인 클래스 4. 채용 정보...',cat:'spam',important:false,reply:false},
+    {from:'빌딩포인트코리아 <info@buildingpoint.co.kr>',subj:'스케치업 프로 제품 한정 15% 할인 혜택!',snip:'스케치업 기초부터 탄탄하게 배우기 — 한정 프로모션...',cat:'spam',important:false,reply:false},
+    {from:'Claude <hello@anthropic.com>',subj:'Your first "aha moment" with Claude',snip:'The moment happens faster when you give Claude context. Here is how...',cat:'spam',important:false,reply:false},
+    {from:'Link <no-reply@link.com>',subj:'New device login to your Link account',snip:'We noticed a login to your Link account from a new device...',cat:'personal',important:false,reply:false},
+  ]
+};
+
+/* =========================================================
+   FEATURE 1 — Meeting minutes
+   ========================================================= */
+$('#m-transcript').value = MOCK.transcript;
+$('#m-title').value = '3분기 마케팅 전략 킥오프';
+if(!S.meetingAttendees.length){S.meetingAttendees.push('minji@company.com','junho@company.com','seoyeon@company.com');setupTags('#m-attendees-box','#m-attendees-input',S.meetingAttendees);}
+
+/* --- 녹음 파일 → 텍스트 (STT) --- */
+let audioFile=null;
+$('#m-audio').addEventListener('change',e=>{audioFile=e.target.files[0]||null;$('#m-audio-name').textContent=audioFile?audioFile.name:'선택된 파일 없음';});
+$('#m-transcribe').addEventListener('click',async()=>{
+  const btn=$('#m-transcribe');
+  if(S.mode==='demo'){
+    btn.disabled=true;btn.innerHTML='<span class="loader"></span> 변환 중…';
+    await sleep(1400);
+    $('#m-transcript').value=MOCK.transcript;
+    btn.disabled=false;btn.innerHTML='🎧 텍스트로 변환';
+    toast('✓ 녹음 → 텍스트 변환 완료 (데모)');return;
+  }
+  if(!audioFile){toast('⚠ 녹음 파일을 선택하세요');return;}
+  const key=S.llm.provider==='openai'?S.llm.key:'';
+  if(!key){toast('⚠ 음성 변환은 OpenAI 키가 필요합니다 (설정 → 제공자: OpenAI)');return;}
+  btn.disabled=true;btn.innerHTML='<span class="loader"></span> 변환 중…';
+  try{
+    const fd=new FormData();fd.append('file',audioFile);fd.append('model','whisper-1');
+    const r=await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST',headers:{'authorization':'Bearer '+key},body:fd});
+    const j=await r.json();if(j.error)throw new Error(j.error.message);
+    $('#m-transcript').value=j.text;toast('✓ 변환 완료');
+  }catch(e){toast('⚠ '+e.message);}
+  btn.disabled=false;btn.innerHTML='🎧 텍스트로 변환';
+});
+
+/* --- 회의록 → Word 문서 내보내기 (라이브러리 있으면 .docx, 없으면 .doc 폴백) --- */
+function dl(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);}
+async function exportWord(title,r){
+  const safe=(title||'회의록').replace(/[\\/:*?"<>|]/g,'_');
+  if(window.docx){
+    try{
+      const {Document,Packer,Paragraph,HeadingLevel,TextRun}=window.docx;
+      const k=[new Paragraph({text:title,heading:HeadingLevel.TITLE}),
+        new Paragraph({children:[new TextRun({text:'생성일: '+new Date().toLocaleString('ko-KR'),italics:true,color:'888888'})]}),
+        new Paragraph({text:'한 줄 요약',heading:HeadingLevel.HEADING_2}),new Paragraph(r.summary),
+        new Paragraph({text:'주요 안건',heading:HeadingLevel.HEADING_2})];
+      r.agenda.forEach(a=>k.push(new Paragraph({text:a,bullet:{level:0}})));
+      k.push(new Paragraph({text:'결정 사항',heading:HeadingLevel.HEADING_2}));
+      r.decisions.forEach(a=>k.push(new Paragraph({text:a,bullet:{level:0}})));
+      k.push(new Paragraph({text:'액션 아이템',heading:HeadingLevel.HEADING_2}));
+      r.actions.forEach(a=>k.push(new Paragraph({children:[new TextRun({text:a.task,bold:true}),new TextRun(' — '+a.owner+' ('+a.due+')')],bullet:{level:0}})));
+      const blob=await Packer.toBlob(new Document({sections:[{children:k}]}));
+      dl(blob,safe+'.docx');toast('✓ Word(.docx) 저장됨');return;
+    }catch(e){/* fall through to .doc */}
+  }
+  const html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(title)+'</title></head><body style="font-family:맑은 고딕,sans-serif">'+
+    '<h1>'+esc(title)+'</h1><p style="color:#888"><i>생성일: '+new Date().toLocaleString('ko-KR')+'</i></p>'+
+    '<h2>한 줄 요약</h2><p>'+esc(r.summary)+'</p>'+
+    '<h2>주요 안건</h2><ul>'+r.agenda.map(a=>'<li>'+esc(a)+'</li>').join('')+'</ul>'+
+    '<h2>결정 사항</h2><ul>'+r.decisions.map(a=>'<li>'+esc(a)+'</li>').join('')+'</ul>'+
+    '<h2>액션 아이템</h2><ul>'+r.actions.map(a=>'<li><b>'+esc(a.task)+'</b> — '+esc(a.owner)+' ('+esc(a.due)+')</li>').join('')+'</ul></body></html>';
+  dl(new Blob(['﻿'+html],{type:'application/msword'}),safe+'.doc');toast('✓ Word 문서 저장됨');
+}
+
+function renderMinutes(c,title,r,attendees,sent){
+  c.innerHTML='';
+  c.appendChild(el('div','result-head','📝 회의록 — '+esc(title)));
+  const b=el('div','result-body');
+  b.innerHTML =
+    '<h4>한 줄 요약</h4><div>'+esc(r.summary)+'</div>'+
+    '<h4>주요 안건</h4><ul>'+r.agenda.map(a=>'<li>'+esc(a)+'</li>').join('')+'</ul>'+
+    '<h4>결정 사항</h4><ul>'+r.decisions.map(a=>'<li>'+esc(a)+'</li>').join('')+'</ul>'+
+    '<h4>액션 아이템</h4><ul>'+r.actions.map(a=>'<li><b>'+esc(a.task)+'</b> — '+esc(a.owner)+' · <span style="color:var(--warn)">'+esc(a.due)+'</span></li>').join('')+'</ul>';
+  const btn=el('button','btn primary',sent?'✓ 발송 완료':'✉ 참가자 '+attendees.length+'명에게 보내기');
+  btn.style.marginTop='18px'; if(sent)btn.disabled=true;
+  btn.onclick=async()=>{
+    btn.disabled=true; btn.innerHTML='<span class="loader"></span> 발송 중…';
+    try{
+      const body=r.summary+'\n\n[결정사항]\n- '+r.decisions.join('\n- ')+'\n\n[액션아이템]\n'+r.actions.map(a=>`- ${a.task} (${a.owner}, ${a.due})`).join('\n');
+      if(S.mode==='live'){ if(!S.google.ready)throw new Error('Google 미연결'); await gmailSend(attendees.join(','),'[회의록] '+title,body); }
+      else await sleep(800);
+      btn.innerHTML='✓ '+attendees.length+'명에게 발송 완료'; toast('✓ 회의록을 참가자에게 보냈습니다');
+    }catch(e){btn.disabled=false;btn.innerHTML='✉ 다시 보내기';toast('⚠ '+e.message);}
+  };
+  const wbtn=el('button','btn','📄 Word 문서로 저장');
+  wbtn.onclick=()=>exportWord(title,r);
+  const row=el('div'); row.style.cssText='display:flex;gap:8px;margin-top:18px;flex-wrap:wrap';
+  btn.style.marginTop='0'; row.appendChild(btn); row.appendChild(wbtn);
+  b.appendChild(row); c.appendChild(b);
+}
+
+$('#m-run').addEventListener('click',async()=>{
+  const title=$('#m-title').value||'제목 없는 회의';
+  const transcript=$('#m-transcript').value.trim();
+  if(!transcript){toast('⚠ 녹취록을 입력하세요');return;}
+  const c=$('#m-result');
+  const out=await runSteps(c,['녹취록 분석','안건·결정사항 추출','액션아이템 정리','회의록 포맷팅'],async(i,o)=>{
+    if(S.mode==='demo'){await sleep(600); if(i===3)o.r=MOCK.meetingResult; return;}
+    if(i===3){
+      const sys='너는 회의록 작성 비서다. 반드시 JSON으로만 답하라: {summary, agenda[], decisions[], actions:[{task,owner,due}]}';
+      const txt=await callLLM(sys,'다음 회의 녹취록을 회의록으로 정리해줘:\n\n'+transcript);
+      o.r=JSON.parse(txt.replace(/```json|```/g,'').trim());
+    }else await sleep(300);
+  });
+  renderMinutes(c,title,out.r,S.meetingAttendees,false);
+});
+
+/* =========================================================
+   FEATURE 2 — Weekly report
+   ========================================================= */
+$('#w-run').addEventListener('click',async()=>{
+  const tone=$('#w-tone').value;
+  const c=$('#w-result');
+  const out=await runSteps(c,['캘린더 일정 수집','주고받은 메일 수집','업무 내용 분석','주간 실적·차주 계획 작성'],async(i,o)=>{
+    if(S.mode==='demo'){
+      await sleep(650);
+      if(i===0)o.events=MOCK.calEvents;
+      if(i===3)o.report=DEMO_WEEKLY(tone);
+      return;
+    }
+    if(i===0){const ev=await calendarThisWeek();o.events=ev.map(e=>e.summary||'(제목없음)');}
+    if(i===1){o.mailIds=await gmailSearch('newer_than:7d');}
+    if(i===3){
+      const sys='너는 주간 업무 보고 비서다. 캘린더 일정과 메일을 바탕으로 주간 실적과 차주 계획을 작성하라. 어조:'+(tone==='boss'?'팀장 보고용 격식체':'팀 공유용 간결체');
+      o.report=await callLLM(sys,'이번 주 일정:\n'+(o.events||[]).join(', ')+'\n\n위를 바탕으로 [주간 실적]과 [차주 계획]을 작성해줘.');
+    }
+  });
+  // sources
+  $('#w-sources').innerHTML='<div class="card"><h3>📥 수집된 일정 '+(out.events?out.events.length:0)+'건</h3><div style="font-size:13px;color:var(--muted)">'+(out.events||[]).map(esc).join(' · ')+'</div></div>';
+  c.innerHTML='';
+  c.appendChild(el('div','result-head','📊 주간 업무 보고서'));
+  const b=el('div','result-body');
+  b.innerHTML = (typeof out.report==='string')? '<div style="white-space:pre-wrap">'+esc(out.report)+'</div>' : out.report;
+  const btn=el('button','btn primary','✉ 내 메일로 보내기');btn.style.marginTop='16px';
+  btn.onclick=async()=>{btn.disabled=true;btn.innerHTML='<span class="loader"></span>';try{if(S.mode==='live'){await gmailSend('me','[주간보고] '+new Date().toLocaleDateString(),b.innerText);}else await sleep(700);btn.innerHTML='✓ 발송 완료';toast('✓ 주간 보고서를 메일로 보냈습니다');}catch(e){btn.disabled=false;btn.innerHTML='✉ 다시 보내기';toast('⚠ '+e.message);}};
+  b.appendChild(btn);
+  c.appendChild(b);
+});
+function DEMO_WEEKLY(tone){
+  if(tone==='boss')return `<h4>■ 금주 실적</h4><ul>
+    <li>3분기 마케팅 전략 킥오프 진행, 광고 예산 20% 증액 방향 확정</li>
+    <li>신규 가입 전환율 2.9% → 3.8% 개선 (상세페이지 개편 효과)</li>
+    <li>대행사 미팅 및 디자인팀 싱크 완료, 채널별 ROAS 리뷰 착수</li>
+    <li>신규 채용 면접 1건 진행</li></ul>
+    <h4>■ 차주 계획</h4><ul>
+    <li>채널별 ROAS 분석 리포트 검토 후 예산 재배분 (수)</li>
+    <li>신규 랜딩페이지 A/B 테스트 결과 1차 확인</li>
+    <li>인플루언서 협업 예산 승인 요청 및 후보 셀렉</li>
+    <li>인스타 릴스 콘텐츠 비중 확대안 구체화</li></ul>`;
+  return `<h4>이번 주 한 일</h4><ul>
+    <li>마케팅 킥오프 ✓ / 전환율 3.8% 달성 ✓</li>
+    <li>대행사·디자인 싱크 ✓ / ROAS 리뷰 시작</li></ul>
+    <h4>다음 주 할 일</h4><ul>
+    <li>ROAS 리포트 → 예산 재배분</li><li>랜딩 A/B 결과 확인</li><li>인플루언서 협업 승인 받기</li></ul>`;
+}
+
+/* =========================================================
+   FEATURE 3 — Email triage
+   ========================================================= */
+$('#t-run').addEventListener('click',async()=>{
+  const c=$('#t-result');
+  const out=await runSteps(c,['안 읽은 메일 검색','업무·개인·스팸 분류','중요 발신자·긴급 키워드 표시','스팸 정리','요약 보고서 작성·발송'],async(i,o)=>{
+    if(S.mode==='demo'){await sleep(620); if(i===0)o.mails=JSON.parse(JSON.stringify(MOCK.mails)); return;}
+    if(i===0){
+      const ids=await gmailSearch('is:unread newer_than:1d');
+      o.mails=[];
+      for(const m of ids.slice(0,15)){const d=await gmailGet(m.id);const h=k=>(d.payload.headers.find(x=>x.name===k)||{}).value||'';o.mails.push({id:m.id,from:h('From'),subj:h('Subject'),snip:d.snippet||'',cat:'work',important:false,reply:false});}
+    }
+    if(i===1){
+      for(const m of o.mails){
+        const sys='메일을 work/personal/spam 중 하나로 분류하고 답장 필요 여부를 판단. JSON {cat, reply} 로만 답하라.';
+        try{const t=await callLLM(sys,'From:'+m.from+'\nSubject:'+m.subj+'\n'+m.snip);const j=JSON.parse(t.replace(/```json|```/g,'').trim());m.cat=j.cat;m.reply=j.reply;}catch(e){}
+      }
+    }
+    if(i===2){
+      o.mails.forEach(m=>{
+        const fromImp=S.importantSenders.some(s=>m.from.includes(s));
+        const kwImp=S.urgentKeywords.some(k=>(m.subj+m.snip).includes(k));
+        m.important = m.cat!=='spam' && (fromImp||kwImp);
+      });
+    }
+    if(i===3 && S.mode==='live'){for(const m of o.mails.filter(x=>x.cat==='spam')){try{await gmailTrash(m.id);}catch(e){}}}
+    if(i===4 && S.mode==='live'){
+      const rep='안읽음 '+o.mails.length+'건 / 중요 '+o.mails.filter(m=>m.important).length+'건 / 스팸 '+o.mails.filter(m=>m.cat==='spam').length+'건 삭제';
+      try{await gmailSend('me','[메일정리] '+new Date().toLocaleDateString(),rep);}catch(e){}
+    }
+  });
+  // demo flag importance even if classify step skipped
+  if(S.mode==='demo'){out.mails.forEach(m=>{const fromImp=S.importantSenders.some(s=>m.from.includes(s));const kwImp=S.urgentKeywords.some(k=>(m.subj+m.snip).includes(k));if(m.cat!=='spam'&&(fromImp||kwImp))m.important=true;});}
+  renderTriage(c,out.mails);
+});
+function renderTriage(c,mails){
+  const work=mails.filter(m=>m.cat==='work'), personal=mails.filter(m=>m.cat==='personal'), spam=mails.filter(m=>m.cat==='spam');
+  const important=mails.filter(m=>m.important), reply=mails.filter(m=>m.reply);
+  c.innerHTML='';
+  c.appendChild(el('div','result-head','📬 메일 정리 완료'));
+  const b=el('div','result-body');
+  b.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+
+    '<span class="chip work">업무 '+work.length+'</span>'+
+    '<span class="chip personal">개인 '+personal.length+'</span>'+
+    '<span class="chip spam">스팸 '+spam.length+' '+(S.mode==='live'?'(삭제됨)':'(삭제 대상)')+'</span>'+
+    '<span class="chip important">⭐ 중요 '+important.length+'</span>'+
+    '<span class="chip" style="background:#222a3d;color:var(--muted)">↩ 답장필요 '+reply.length+'</span></div>';
+  if(important.length){
+    b.appendChild(el('h4',null,'⭐ 중요 — 우선 확인'));
+    const list=el('div','maillist');
+    important.forEach(m=>list.appendChild(mailRow(m)));
+    b.appendChild(list);
+  }
+  b.appendChild(el('h4',null,'📂 전체 분류'));
+  const all=el('div','maillist');
+  mails.forEach(m=>all.appendChild(mailRow(m)));
+  b.appendChild(all);
+  const btn=el('button','btn primary','✉ 요약 보고서 내 메일로 받기');btn.style.marginTop='16px';
+  btn.onclick=async()=>{btn.disabled=true;btn.innerHTML='<span class="loader"></span>';await sleep(700);btn.innerHTML='✓ 발송 완료';toast('✓ 메일 요약 보고서를 보냈습니다');};
+  b.appendChild(btn);
+  c.appendChild(b);
+}
+function mailRow(m){
+  const r=el('div','mailrow'+(m.cat==='spam'?' del':''));
+  r.innerHTML='<div style="flex:1"><div class="from">'+esc(m.from)+' '+
+    (m.important?'<span class="chip important">⭐ 중요</span>':'')+
+    (m.reply?'<span class="chip" style="background:#222a3d;color:var(--muted)">↩ 답장</span>':'')+'</div>'+
+    '<div class="subj">'+esc(m.subj)+'</div><div class="snip">'+esc(m.snip)+'</div></div>'+
+    '<span class="chip '+m.cat+'">'+({work:'업무',personal:'개인',spam:'스팸'}[m.cat])+'</span>';
+  return r;
+}
+</script>
+</body>
+</html>
