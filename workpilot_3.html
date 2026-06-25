@@ -320,7 +320,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="overlay" id="pwOverlay"><div class="modal" style="max-width:360px"><div class="modal-head"><h3>🔒 설정 잠금</h3><button class="x" id="pwClose">×</button></div><div class="modal-body"><div class="field"><label>비밀번호</label><input type="password" id="pwInput" placeholder="비밀번호 입력" /></div><div id="pwErr" class="hint" style="color:var(--danger);display:none">비밀번호가 올바르지 않습니다.</div><button class="btn primary" id="pwSubmit" style="width:100%;justify-content:center;margin-top:6px">확인</button></div></div></div><div class="toast" id="toast"></div>
 
 <script>
 /* =========================================================
@@ -372,7 +372,7 @@ $('#tabs').addEventListener('click',e=>{
   [...$('#tabs').children].forEach(x=>x.classList.toggle('active',x===t));
   ['meeting','weekly','triage'].forEach(n=>$('#tab-'+n).style.display = (n===t.dataset.tab)?'block':'none');
 });
-$('#settingsBtn').addEventListener('click',()=>$('#overlay').classList.add('open'));
+let settingsUnlocked=false;function openSettings(){$('#overlay').classList.add('open');}$('#settingsBtn').addEventListener('click',()=>{if(settingsUnlocked){openSettings();}else{$('#pwErr').style.display='none';$('#pwInput').value='';$('#pwOverlay').classList.add('open');setTimeout(()=>$('#pwInput').focus(),50);}});$('#pwClose').addEventListener('click',()=>$('#pwOverlay').classList.remove('open'));$('#pwOverlay').addEventListener('click',e=>{if(e.target===$('#pwOverlay'))$('#pwOverlay').classList.remove('open');});function tryPw(){if($('#pwInput').value==='민제123'){settingsUnlocked=true;$('#pwOverlay').classList.remove('open');openSettings();}else{$('#pwErr').style.display='block';}}$('#pwSubmit').addEventListener('click',tryPw);$('#pwInput').addEventListener('keydown',e=>{if(e.key==='Enter')tryPw();});
 $('#closeSettings').addEventListener('click',()=>$('#overlay').classList.remove('open'));
 $('#overlay').addEventListener('click',e=>{if(e.target===$('#overlay'))$('#overlay').classList.remove('open');});
 $('#s-provider').addEventListener('change',e=>{S.llm.provider=e.target.value;saveCreds();});
