@@ -171,7 +171,7 @@
             <span id="m-audio-name" class="hint" style="margin:0">선택된 파일 없음</span>
             <button class="btn" id="m-transcribe">🎧 텍스트로 변환</button>
           </div>
-          <div class="hint">녹음을 올리면 AI가 받아쓰기(STT) 후 아래 칸을 채웁니다. (실연동: OpenAI Whisper)</div>
+          <div class="hint">녹음을 올리면 AI가 받아쓰기(STT) 후 아래 칸을 채웁니다. (실연동: Gemini · 최대 ~8분 권장)</div>
         </div>
         <div class="field">
           <label>회의 녹취록 / 메모</label>
@@ -299,8 +299,13 @@
       </div>
       <div class="field">
         <label>API Key</label>
-        <input type="password" id="s-apikey" placeholder="sk-..." />
-        <div class="hint">키는 이 브라우저 메모리에만 보관되며 서버로 전송되지 않습니다.</div>
+        <input type="password" id="s-apikey" placeholder="sk-ant-..." />
+        <div class="hint">회의록·보고서·메일 분류 생성에 사용. 이 브라우저에만 저장됩니다.</div>
+      </div>
+      <div class="field">
+        <label>Gemini API 키 <span style="font-weight:400;color:var(--faint)">(음성 변환용 · 선택)</span></label>
+        <input type="password" id="s-gemini" placeholder="AIza..." />
+        <div class="hint">녹음 파일 → 텍스트 변환(STT)에 사용. Google AI Studio에서 무료 발급. 회의록 생성은 위 Claude 키를 씁니다.</div>
       </div>
       <div class="note">⚠ 브라우저에서 직접 LLM을 호출하면 API 키가 네트워크 요청에 노출됩니다. 개인 포트폴리오 데모엔 무방하지만, 실제 서비스라면 키 호출은 백엔드로 옮겨야 합니다.</div>
     </div>
@@ -317,12 +322,23 @@
    ========================================================= */
 const S = {
   mode: 'demo',
-  google: { clientId:'', token:null, ready:false },
+  google: { clientId:'992265467912-bs7it91e5klfp6vhc1mahi182u9aohto.apps.googleusercontent.com', token:null, ready:false },
   llm: { provider:'anthropic', key:'' },
+  gemini: { key:'' },
   meetingAttendees: [],
   importantSenders: ['noreply@github.com','notifications@vercel.com'],
   urgentKeywords: ['로그인','sign-in','승인','계약','마감','긴급'],
 };
+
+// ── 자격증명을 localStorage에 저장 (직접 호스팅하는 단독 앱이라 안전) ──
+try{
+  const saved=JSON.parse(localStorage.getItem('wp_creds')||'{}');
+  if(saved.clientId)S.google.clientId=saved.clientId;
+  if(saved.llmKey)S.llm.key=saved.llmKey;
+  if(saved.geminiKey)S.gemini.key=saved.geminiKey;
+  if(saved.provider)S.llm.provider=saved.provider;
+}catch(e){}
+function saveCreds(){try{localStorage.setItem('wp_creds',JSON.stringify({clientId:S.google.clientId,llmKey:S.llm.key,geminiKey:S.gemini.key,provider:S.llm.provider}));}catch(e){}}
 
 /* ---------- tiny helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -350,9 +366,12 @@ $('#tabs').addEventListener('click',e=>{
 $('#settingsBtn').addEventListener('click',()=>$('#overlay').classList.add('open'));
 $('#closeSettings').addEventListener('click',()=>$('#overlay').classList.remove('open'));
 $('#overlay').addEventListener('click',e=>{if(e.target===$('#overlay'))$('#overlay').classList.remove('open');});
-$('#s-provider').addEventListener('change',e=>S.llm.provider=e.target.value);
-$('#s-apikey').addEventListener('input',e=>S.llm.key=e.target.value.trim());
-$('#s-gclient').addEventListener('input',e=>S.google.clientId=e.target.value.trim());
+$('#s-provider').addEventListener('change',e=>{S.llm.provider=e.target.value;saveCreds();});
+$('#s-apikey').addEventListener('input',e=>{S.llm.key=e.target.value.trim();saveCreds();});
+$('#s-gclient').addEventListener('input',e=>{S.google.clientId=e.target.value.trim();saveCreds();});
+$('#s-gemini').addEventListener('input',e=>{S.gemini.key=e.target.value.trim();saveCreds();});
+// 저장된 값 미리 채우기
+$('#s-gclient').value=S.google.clientId; $('#s-apikey').value=S.llm.key; $('#s-gemini').value=S.gemini.key; $('#s-provider').value=S.llm.provider;
 
 /* ---------- tag inputs ---------- */
 function setupTags(boxSel,inputSel,arr,render){
@@ -530,17 +549,51 @@ $('#m-transcribe').addEventListener('click',async()=>{
     toast('✓ 녹음 → 텍스트 변환 완료 (데모)');return;
   }
   if(!audioFile){toast('⚠ 녹음 파일을 선택하세요');return;}
-  const key=S.llm.provider==='openai'?S.llm.key:'';
-  if(!key){toast('⚠ 음성 변환은 OpenAI 키가 필요합니다 (설정 → 제공자: OpenAI)');return;}
+  if(!S.gemini.key){toast('⚠ 음성 변환은 Gemini 키가 필요합니다 (설정 → Gemini API 키)');return;}
   btn.disabled=true;btn.innerHTML='<span class="loader"></span> 변환 중…';
   try{
-    const fd=new FormData();fd.append('file',audioFile);fd.append('model','whisper-1');
-    const r=await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST',headers:{'authorization':'Bearer '+key},body:fd});
-    const j=await r.json();if(j.error)throw new Error(j.error.message);
-    $('#m-transcript').value=j.text;toast('✓ 변환 완료');
+    const wavB64=await fileToWavBase64(audioFile);
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',{
+      method:'POST',
+      headers:{'content-type':'application/json','x-goog-api-key':S.gemini.key},
+      body:JSON.stringify({contents:[{parts:[
+        {text:'다음 오디오는 회의 녹음입니다. 들리는 내용을 한국어로 정확히 받아써 주세요. 가능하면 화자를 구분해 표시하고, 군더더기(음, 어)는 정리하세요. 전사 텍스트만 출력하고 다른 설명은 붙이지 마세요.'},
+        {inlineData:{mimeType:'audio/wav',data:wavB64}}
+      ]}]})
+    });
+    const j=await r.json(); if(j.error)throw new Error(j.error.message||'Gemini 오류');
+    const text=(((j.candidates||[])[0]||{}).content||{}).parts?.[0]?.text||'';
+    if(!text)throw new Error('변환 결과가 비었습니다 (오디오가 길거나 형식 문제일 수 있어요)');
+    $('#m-transcript').value=text;toast('✓ 변환 완료');
   }catch(e){toast('⚠ '+e.message);}
   btn.disabled=false;btn.innerHTML='🎧 텍스트로 변환';
 });
+// 오디오 파일 → 16kHz mono WAV(base64). 브라우저가 디코드 가능한 모든 포맷(m4a/mp3/wav 등) 지원.
+async function fileToWavBase64(file){
+  const buf=await file.arrayBuffer();
+  const ac=new (window.AudioContext||window.webkitAudioContext)();
+  const decoded=await ac.decodeAudioData(buf);
+  const sr=16000;
+  const off=new OfflineAudioContext(1,Math.max(1,Math.ceil(decoded.duration*sr)),sr);
+  const node=off.createBufferSource();node.buffer=decoded;node.connect(off.destination);node.start();
+  const rendered=await off.startRendering();
+  const pcm=rendered.getChannelData(0);
+  const wav=encodeWav(pcm,sr);
+  let bin='';const bytes=new Uint8Array(wav);const CH=0x8000;
+  for(let i=0;i<bytes.length;i+=CH)bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));
+  return btoa(bin);
+}
+function encodeWav(samples,sampleRate){
+  const buffer=new ArrayBuffer(44+samples.length*2);const view=new DataView(buffer);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF');view.setUint32(4,36+samples.length*2,true);ws(8,'WAVE');ws(12,'fmt ');
+  view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+  view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);
+  view.setUint16(32,2,true);view.setUint16(34,16,true);ws(36,'data');
+  view.setUint32(40,samples.length*2,true);
+  let o=44;for(let i=0;i<samples.length;i++,o+=2){const s=Math.max(-1,Math.min(1,samples[i]));view.setInt16(o,s<0?s*0x8000:s*0x7FFF,true);}
+  return buffer;
+}
 
 /* --- 회의록 → Word 문서 내보내기 (라이브러리 있으면 .docx, 없으면 .doc 폴백) --- */
 function dl(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);}
