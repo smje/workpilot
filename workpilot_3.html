@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>WorkPilot — AI 업무 자동화 비서</title>
+<title>직장인 업무 자동화 Agent</title>
 <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 <style>
   :root{
     --bg:#0b0d12; --surface:#141821; --surface-2:#1b2030; --line:#262c3a;
     --text:#e7eaf0; --muted:#9aa3b5; --faint:#646d80;
-    --brand:#6c8cff; --brand-2:#8a6cff; --ok:#3ecf8e; --warn:#ffb547; --danger:#ff6b6b;
+    --brand:#F37321; --brand-2:#EA002C; --ok:#3ecf8e; --warn:#ffb547; --danger:#ff6b6b;
     --radius:14px; --shadow:0 10px 40px rgba(0,0,0,.35);
     --font:'Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Segoe UI',Roboto,sans-serif;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,#1a1f33 0%,var(--bg) 55%);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;line-height:1.5}
+  body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,#2a1512 0%,var(--bg) 55%);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased;line-height:1.5}
   a{color:var(--brand)}
   .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
 
@@ -23,7 +23,9 @@
   .bar{display:flex;align-items:center;gap:16px;padding:14px 0}
   .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.02em}
   .logo .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-2));display:grid;place-items:center;font-size:16px;box-shadow:0 4px 14px rgba(108,140,255,.4)}
-  .spacer{flex:1}#modeToggle,#modePill{display:none}
+  .spacer{flex:1}
+  #modeToggle,#modePill{display:none}
+  .skbar{background:linear-gradient(90deg,#EA002C,#F37321);color:#fff;text-align:center;font-weight:700;font-size:13px;letter-spacing:-.01em;padding:9px 16px}
   .mode-toggle{display:flex;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px}
   .mode-toggle button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px;cursor:pointer;transition:.15s}
   .mode-toggle button.active{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff}
@@ -123,9 +125,10 @@
 </style>
 </head>
 <body>
+<div class="skbar">SK 신입구성원 과정 : AI Agent 제작 프로젝트</div>
 <header>
   <div class="wrap bar">
-    <div class="logo"><span class="mark">✦</span> WorkPilot</div>
+    <div class="logo"><span class="mark">✦</span> 직장인 업무 자동화 Agent</div>
     <span class="spacer"></span>
     <div class="mode-toggle" id="modeToggle">
       <button data-mode="demo" class="active">데모 모드</button>
@@ -137,7 +140,7 @@
 
 <main class="wrap">
   <section class="hero">
-    <h1>AI 업무 자동화 비서 <span class="modepill demo" id="modePill">● 데모 모드</span></h1>
+    <h1>직장인 업무 자동화 Agent <span class="modepill demo" id="modePill">● 데모 모드</span></h1>
     <p>회의록 작성, 주간 보고, 메일 정리 — 직장인이 매일 반복하는 일을 AI가 대신합니다. Gmail·캘린더에 실제 연동되며, 결과는 그대로 메일로 발송됩니다.</p>
   </section>
 
@@ -265,7 +268,7 @@
   </section>
 </main>
 
-<footer>WorkPilot · 단일 페이지 AI 자동화 데모 · 데모 모드는 설정 없이 즉시 작동합니다</footer>
+<footer>직장인 업무 자동화 Agent · SK 신입구성원 과정 — AI Agent 제작 프로젝트</footer>
 
 <!-- Settings Modal -->
 <div class="overlay" id="overlay">
@@ -532,9 +535,7 @@ const MOCK = {
 /* =========================================================
    FEATURE 1 — Meeting minutes
    ========================================================= */
-$('#m-transcript').value = '';
-$('#m-title').value = '';
-if(!S.meetingAttendees.length){setupTags('#m-attendees-box','#m-attendees-input',S.meetingAttendees);}
+// (실연동 전용 — 시작 시 예시 자동 채움 없음)
 
 /* --- 녹음 파일 → 텍스트 (STT) --- */
 let audioFile=null;
@@ -552,7 +553,9 @@ $('#m-transcribe').addEventListener('click',async()=>{
   if(!S.gemini.key){toast('⚠ 음성 변환은 Gemini 키가 필요합니다 (설정 → Gemini API 키)');return;}
   btn.disabled=true;btn.innerHTML='<span class="loader"></span> 변환 중…';
   try{
-    if(audioFile.size>14680064)throw new Error('파일이 큽니다(~14MB↑). 10분 이내로 잘라 주세요');let mime=audioFile.type||'audio/mp4';if(/m4a|mp4/i.test(mime))mime='audio/mp4';const b64=await fileToB64(audioFile);
+    if(audioFile.size>14*1024*1024)throw new Error('파일이 큽니다 ('+(audioFile.size/1048576).toFixed(1)+'MB). 인라인 한도상 ~14MB(대략 10분 내외) 이하로 잘라서 시도해 주세요.');
+    let mime=audioFile.type||'audio/mp4'; if(/m4a|mp4/i.test(mime))mime='audio/mp4';
+    const b64=await fileToB64(audioFile);
     const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',{
       method:'POST',
       headers:{'content-type':'application/json','x-goog-api-key':S.gemini.key},
@@ -568,31 +571,14 @@ $('#m-transcribe').addEventListener('click',async()=>{
   }catch(e){toast('⚠ '+e.message);}
   btn.disabled=false;btn.innerHTML='🎧 텍스트로 변환';
 });
-// 오디오 파일 → 16kHz mono WAV(base64). 브라우저가 디코드 가능한 모든 포맷(m4a/mp3/wav 등) 지원.
-function fileToB64(file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]);fr.onerror=()=>rej(new Error('읽기 실패'));fr.readAsDataURL(file);});} async function fileToWavBase64(file){
-  const buf=await file.arrayBuffer();
-  const ac=new (window.AudioContext||window.webkitAudioContext)();
-  const decoded=await ac.decodeAudioData(buf);
-  const sr=16000;
-  const off=new OfflineAudioContext(1,Math.max(1,Math.ceil(decoded.duration*sr)),sr);
-  const node=off.createBufferSource();node.buffer=decoded;node.connect(off.destination);node.start();
-  const rendered=await off.startRendering();
-  const pcm=rendered.getChannelData(0);
-  const wav=encodeWav(pcm,sr);
-  let bin='';const bytes=new Uint8Array(wav);const CH=0x8000;
-  for(let i=0;i<bytes.length;i+=CH)bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));
-  return btoa(bin);
-}
-function encodeWav(samples,sampleRate){
-  const buffer=new ArrayBuffer(44+samples.length*2);const view=new DataView(buffer);
-  const ws=(o,s)=>{for(let i=0;i<s.length;i++)view.setUint8(o+i,s.charCodeAt(i));};
-  ws(0,'RIFF');view.setUint32(4,36+samples.length*2,true);ws(8,'WAVE');ws(12,'fmt ');
-  view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
-  view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*2,true);
-  view.setUint16(32,2,true);view.setUint16(34,16,true);ws(36,'data');
-  view.setUint32(40,samples.length*2,true);
-  let o=44;for(let i=0;i<samples.length;i++,o+=2){const s=Math.max(-1,Math.min(1,samples[i]));view.setInt16(o,s<0?s*0x8000:s*0x7FFF,true);}
-  return buffer;
+// 오디오 파일 → base64 (디코딩 없이 원본 그대로 — 메모리 안전). FileReader 사용.
+function fileToB64(file){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onload=()=>res(String(fr.result).split(',')[1]);
+    fr.onerror=()=>rej(new Error('파일 읽기 실패'));
+    fr.readAsDataURL(file);
+  });
 }
 
 /* --- 회의록 → Word 문서 내보내기 (라이브러리 있으면 .docx, 없으면 .doc 폴백) --- */
